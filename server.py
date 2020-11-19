@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask import jsonify
+from flask_cors import CORS
 import json 
 import click
 
@@ -12,6 +13,7 @@ app.config['SQLALCHEMY_DATABASE_URI']= DATABASE_URI
 app.config['FLASK_APP']='server'
 db = SQLAlchemy(app)
 db.create_all()
+cors=CORS(app)
 
 class Machine(db.Model):
     id=db.Column(db.Integer, primary_key=True)
