@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask import jsonify
 from flask_cors import CORS
@@ -10,7 +10,6 @@ DATABASE_URI = 'sqlite:///machines.db'
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI']= DATABASE_URI
-app.config['FLASK_APP']='server'
 db = SQLAlchemy(app)
 db.create_all()
 cors=CORS(app)
@@ -92,8 +91,8 @@ def initDb():
     newMachine('0',findLaundId('laverie du port','123 rue du port'))
     newMachine('0',findLaundId('laverie du port','123 rue du port'))
     newMachine('0',findLaundId('laverie du port','123 rue du port'))
-    changeState(1,'1')
     newMachine('0', findLaundId('laverie du port', '123 rue du port'))
+    changeState(1,'1')
     newMachine('1', findLaundId('laverie de la terre','456 chemin'))
     newMachine('1', findLaundId('laverie de la terre','456 chemin'))
     newMachine('1', findLaundId('laverie de la terre','456 chemin'))
@@ -156,16 +155,24 @@ def initDbCommand():
 
 @app.route('/')
 def home():
-    client = findClient(1)
-    machines = []
-    launds = getLaunds(client)
-    for l in launds:
-        print(l.name)
-    for laund in launds:
-        machines.append(getMachines(laund.name,laund.address))
+    try :
+        client = findClient(int(request.args.get('id')))
+    except KeyError:
+        print("error key")
+        
+    if client is not None:
+        machines = []
+        launds = getLaunds(client)
+        for l in launds:
+            print(l.name)
+        for laund in launds:
+            machines.append(getMachines(laund.name,laund.address))
 
-    data = createData(launds,machines)
-    return jsonify(client="Laverie de "+client.name, stations=data)
+        data = createData(launds,machines)
+        return jsonify(client="Laveries de "+client.name, stations=data)
+
+    return jsonify(client="Tu n'es pas connecté")
+    
     # file = open('example.json')
     # return json.loads(file.read()) 
 
