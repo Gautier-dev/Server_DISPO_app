@@ -2,6 +2,7 @@ from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask import jsonify
 from flask_cors import CORS
+from flask_mqtt import Mqtt
 import json 
 import click
 
@@ -10,7 +11,13 @@ DATABASE_URI = 'sqlite:///machines.db'
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI']= DATABASE_URI
+app.config['MQTT_BROKER_URL'] = HOSTNAME
+app.config['MQTT_BROKER_PORT'] = 1883
+app.config['MQTT_USERNAME'] = 'user'
+app.config['MQTT_PASSWORD'] = 'secret'
+app.config['MQTT_REFRESH_TIME'] = 1.0  # refresh time in seconds
 db = SQLAlchemy(app)
+mqtt = Mqtt(app)
 db.create_all()
 cors=CORS(app)
 
@@ -121,7 +128,6 @@ def getLaunds(client):
     for id in laund_list:
         laund = Laund.query.filter_by(id=id).first()
         launds.append(laund)
-
     return launds
 
 def getMachines(laund, address):
@@ -153,13 +159,25 @@ def initDbCommand():
     initDb()
     click.echo('Initialized the database.')
 
+
+@mqtt.on_connect()
+def handle_connect(client, userdata, flags, rc):
+    mqtt.subscribe('laveries/data')
+
+@mqtt.on_message()
+def handle_mqtt_message(client, userdata, message):
+    data = dict(
+        topic=message.topic,
+        payload=message.payload.decode()
+    )
+    
+
 @app.route('/')
 def home():
     try :
         client = findClient(int(request.args.get('id')))
     except KeyError:
         print("error key")
-        
     if client is not None:
         machines = []
         launds = getLaunds(client)
