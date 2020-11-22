@@ -13,8 +13,8 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI']= DATABASE_URI
 app.config['MQTT_BROKER_URL'] = HOSTNAME
 app.config['MQTT_BROKER_PORT'] = 1883
-app.config['MQTT_USERNAME'] = 'user'
-app.config['MQTT_PASSWORD'] = 'secret'
+app.config['MQTT_USERNAME'] = 'slip'
+app.config['MQTT_PASSWORD'] = 'slip'
 app.config['MQTT_REFRESH_TIME'] = 1.0  # refresh time in seconds
 db = SQLAlchemy(app)
 mqtt = Mqtt(app)
@@ -162,7 +162,7 @@ def initDbCommand():
 
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
-    mqtt.subscribe('laveries/data')
+    mqtt.subscribe('state')
 
 @mqtt.on_message()
 def handle_mqtt_message(client, userdata, message):
@@ -170,7 +170,7 @@ def handle_mqtt_message(client, userdata, message):
         topic=message.topic,
         payload=message.payload.decode()
     )
-    
+    changeState(int(payload[0], int(payload[1]))
 
 @app.route('/')
 def home():
