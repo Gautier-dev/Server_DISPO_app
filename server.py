@@ -24,6 +24,8 @@ cors=CORS(app)
 class Machine(db.Model):
     id=db.Column(db.Integer, primary_key=True)
     state=db.Column(db.Integer)
+    frequency=db.Column(db.Float)
+    type=db.Column(db.String)
     laund_id=db.Column(db.Integer, db.ForeignKey('laund.id'), nullable=False)
 
 class Laund(db.Model):
@@ -77,13 +79,13 @@ def findLaundId(name, address):
     laund = Laund.query.filter_by(name=name).filter_by(address=address).first()
     return laund.id
 
-def newMachine(state, laund_id):
-    machine = Machine(state=state, laund_id=laund_id)
+def newMachine(state, laund_id, freq, type_machine):
+    machine = Machine(state=state, laund_id=laund_id, frequency=freq, type=type_machine)
     db.session.add(machine)
     db.session.commit()
 
-def changeState(id, newState):
-    machine = Machine.query.filter_by(id=id).first()
+def changeState(laund_id, freq, newState):
+    machine = Machine.query.filter_by(laund_id=laund_id, frequency=freq).first()
     machine.state=newState
     db.session.commit()
 
@@ -94,16 +96,14 @@ def initDb():
     newLaund('laverie de la terre','456 chemin')
     addLaund(1,1)
     addLaund(1,2)
-    newMachine('0',findLaundId('laverie du port','123 rue du port'))
-    newMachine('0',findLaundId('laverie du port','123 rue du port'))
-    newMachine('0',findLaundId('laverie du port','123 rue du port'))
-    newMachine('0',findLaundId('laverie du port','123 rue du port'))
-    newMachine('0', findLaundId('laverie du port', '123 rue du port'))
-    changeState(1,'1')
-    newMachine('1', findLaundId('laverie de la terre','456 chemin'))
-    newMachine('1', findLaundId('laverie de la terre','456 chemin'))
-    newMachine('1', findLaundId('laverie de la terre','456 chemin'))
-    newMachine('1', findLaundId('laverie de la terre','456 chemin'))
+    newMachine('0',findLaundId('laverie du port','123 rue du port'), 102.5,"machine")
+    newMachine('0',findLaundId('laverie du port','123 rue du port'), 105.0,"machine")
+    newMachine('0',findLaundId('laverie du port','123 rue du port'), 107.5,"seche-linge")
+    changeState(1,102.5,'1')
+    newMachine('1', findLaundId('laverie de la terre','456 chemin'), 102.5, "machine")
+    newMachine('1', findLaundId('laverie de la terre','456 chemin'), 105.0, "machine")
+    newMachine('1', findLaundId('laverie de la terre','456 chemin'), 107.5, "seche-linge")
+    newMachine('1', findLaundId('laverie de la terre','456 chemin'), 109.0, "seche-linge")
 
     db.session.commit()
 
