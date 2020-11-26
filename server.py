@@ -17,7 +17,7 @@ app.config['MQTT_USERNAME'] = 'slip'
 app.config['MQTT_PASSWORD'] = 'slip'
 app.config['MQTT_REFRESH_TIME'] = 1.0  # refresh time in seconds
 db = SQLAlchemy(app)
-mqtt = Mqtt(app)
+#mqtt = Mqtt(app)
 db.create_all()
 cors=CORS(app)
 
@@ -160,7 +160,7 @@ def initDbCommand():
     click.echo('Initialized the database.')
 
 
-@mqtt.on_connect()
+""" @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
     mqtt.subscribe('state')
 
@@ -170,7 +170,7 @@ def handle_mqtt_message(client, userdata, message):
         topic=message.topic,
         payload=message.payload.decode()
     )
-    changeState(int(payload[0], int(payload[1]))
+    changeState(int(payload[0], int(payload[1]))) """
 
 @app.route('/')
 def home():
@@ -181,8 +181,6 @@ def home():
     if client is not None:
         machines = []
         launds = getLaunds(client)
-        for l in launds:
-            print(l.name)
         for laund in launds:
             machines.append(getMachines(laund.name,laund.address))
 
