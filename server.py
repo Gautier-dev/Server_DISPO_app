@@ -160,9 +160,9 @@ def initDbCommand():
     click.echo('Initialized the database.')
 
 
-""" @mqtt.on_connect()
+@mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
-    mqtt.subscribe('state')
+    mqtt.subscribe('laveries/#')
 
 @mqtt.on_message()
 def handle_mqtt_message(client, userdata, message):
@@ -170,7 +170,10 @@ def handle_mqtt_message(client, userdata, message):
         topic=message.topic,
         payload=message.payload.decode()
     )
-    changeState(int(payload[0], int(payload[1]))) """
+
+    id_lav = int(message.topic.split("/")[1])
+    changeState(id_lav, int(payload[0]), int(payload[1]))
+
 
 @app.route('/')
 def home():
@@ -183,7 +186,6 @@ def home():
         launds = getLaunds(client)
         for laund in launds:
             machines.append(getMachines(laund.name,laund.address))
-
         data = createData(launds,machines)
         return jsonify(client="Laveries de "+client.name, stations=data)
 
