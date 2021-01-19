@@ -34,6 +34,12 @@ class Laund(db.Model):
     address=db.Column(db.String, nullable=False)
     machines = db.relationship('Machine', backref='machines')
 
+class Datapoint(db.Model):
+    id=db.Column(db.Integer, primary_key=True)
+    time=db.Column(db.Date, default=datetime.now())
+    dispo=db.Column(db.Integer, nullable=False)
+    laund_id=db.relationship(db.Integer, db.ForeignKey('laund.id'))
+
 class Client(db.Model):
     id=db.Column(db.Integer, primary_key=True)
     name=db.Column(db.String, nullable=False)
