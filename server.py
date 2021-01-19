@@ -17,13 +17,17 @@ app.config['MQTT_USERNAME'] = 'slip'
 app.config['MQTT_PASSWORD'] = 'slip'
 app.config['MQTT_REFRESH_TIME'] = 1.0  # refresh time in seconds
 db = SQLAlchemy(app)
-#mqtt = Mqtt(app)
+mqtt = Mqtt()
 db.create_all()
 cors=CORS(app)
+
+def create_app():
+    mqtt.init_app(app)
 
 class Machine(db.Model):
     id=db.Column(db.Integer, primary_key=True)
     state=db.Column(db.Integer)
+    frequency=db.Column(db.Float)
     type=db.Column(db.String)
     laund_id=db.Column(db.Integer, db.ForeignKey('laund.id'), nullable=False)
 
@@ -78,13 +82,13 @@ def findLaundId(name, address):
     laund = Laund.query.filter_by(name=name).filter_by(address=address).first()
     return laund.id
 
-def newMachine(state, laund_id):
-    machine = Machine(state=state, laund_id=laund_id)
+def newMachine(state, laund_id, freq, type_machine):
+    machine = Machine(state=state, laund_id=laund_id, frequency=freq, type=type_machine)
     db.session.add(machine)
     db.session.commit()
 
-def changeState(id, newState):
-    machine = Machine.query.filter_by(id=id).first()
+def changeState(laund_id, freq, newState):
+    machine = Machine.query.filter_by(laund_id=laund_id, frequency=freq).first()
     machine.state=newState
     db.session.commit()
 
@@ -95,16 +99,14 @@ def initDb():
     newLaund('laverie de la terre','456 chemin')
     addLaund(1,1)
     addLaund(1,2)
-    newMachine('0',findLaundId('laverie du port','123 rue du port'))
-    newMachine('0',findLaundId('laverie du port','123 rue du port'))
-    newMachine('0',findLaundId('laverie du port','123 rue du port'))
-    newMachine('0',findLaundId('laverie du port','123 rue du port'))
-    newMachine('0', findLaundId('laverie du port', '123 rue du port'))
-    changeState(1,'1')
-    newMachine('1', findLaundId('laverie de la terre','456 chemin'))
-    newMachine('1', findLaundId('laverie de la terre','456 chemin'))
-    newMachine('1', findLaundId('laverie de la terre','456 chemin'))
-    newMachine('1', findLaundId('laverie de la terre','456 chemin'))
+    newMachine('0',findLaundId('laverie du port','123 rue du port'), 102.5,"machine")
+    newMachine('0',findLaundId('laverie du port','123 rue du port'), 105.0,"machine")
+    newMachine('0',findLaundId('laverie du port','123 rue du port'), 107.5,"seche-linge")
+    changeState(1,102.5,'1')
+    newMachine('1', findLaundId('laverie de la terre','456 chemin'), 102.5, "machine")
+    newMachine('1', findLaundId('laverie de la terre','456 chemin'), 105.0, "machine")
+    newMachine('1', findLaundId('laverie de la terre','456 chemin'), 107.5, "seche-linge")
+    newMachine('1', findLaundId('laverie de la terre','456 chemin'), 109.0, "seche-linge")
 
     db.session.commit()
 
@@ -160,21 +162,20 @@ def initDbCommand():
     initDb()
     click.echo('Initialized the database.')
 
-
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
-    mqtt.subscribe('laveries/#')
+    mqtt.subscribe('laverie/#')
 
 @mqtt.on_message()
 def handle_mqtt_message(client, userdata, message):
-    data = dict(
-        topic=message.topic,
-        payload=message.payload.decode()
-    )
-
+    
+    topic=message.topic
+    payload=message.payload.decode('utf-8')
+    print("{},{}".format(topic,payload))
     id_lav = int(message.topic.split("/")[1])
-    changeState(id_lav, int(payload[0]), int(payload[1]))
-
+    changeState(id_lav, float(payload.split(",")[0]), int(payload.split(",")[1]))
+    machine = db.session.query(Machine).filter(Machine.id==1).first()
+    print(machine.state)
 
 @app.route('/')
 def home():
@@ -196,4 +197,5 @@ def home():
     # return json.loads(file.read()) 
 
 if __name__ == "__main__":
+    create_app()
     app.run(host=HOSTNAME,debug=True)
