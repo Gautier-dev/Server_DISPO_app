@@ -5,6 +5,10 @@ from flask_cors import CORS
 from flask_mqtt import Mqtt
 import json 
 import click
+from datetime import datetime
+from multiprocessing import Process
+import time
+import os
 
 HOSTNAME = "127.0.0.1"
 DATABASE_URI = 'sqlite:///machines.db'
@@ -76,6 +80,17 @@ def addLaund(client_id, laund_id):
 
     setLaundList(client, laund_list)
 
+
+def new_data_point(laund, address):
+    machines = getMachines(laund, address)
+    getAvailable(machines)
+
+def metrics_loop(timestep_sec):
+    while True:
+        print("click ! ",os.getpid())
+        time.sleep(timestep_sec)
+        
+
 def newLaund(name, address):
     laund = Laund(name=name, address=address)
     db.session.add(laund)
@@ -94,6 +109,7 @@ def changeState(laund_id, freq, newState):
     machine = Machine.query.filter_by(laund_id=laund_id, frequency=freq).first()
     machine.state=newState
     db.session.commit()
+    mew_data_point(laund_id)
 
 def initDb():
     clearDb()
@@ -125,6 +141,10 @@ def clearDb():
     launds = Laund.query.all()
     for laund in launds:
         db.session.delete(laund)
+
+    datapoints = Datapoint.query.all()
+    for datapoint in datapoints:
+        db.session.delete(datapoint)
 
     db.session.commit()
 
@@ -165,10 +185,11 @@ def initDbCommand():
     initDb()
     click.echo('Initialized the database.')
 
-
+"""
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
     mqtt.subscribe('laveries/#')
+
 
 @mqtt.on_message()
 def handle_mqtt_message(client, userdata, message):
@@ -179,7 +200,7 @@ def handle_mqtt_message(client, userdata, message):
 
     id_lav = int(message.topic.split("/")[1])
     changeState(id_lav, int(payload[0]), int(payload[1]))
-
+"""
 
 @app.route('/')
 def home():
@@ -201,4 +222,7 @@ def home():
     # return json.loads(file.read()) 
 
 if __name__ == "__main__":
+    #p = Process(target=metrics_loop, args=(5,))
+    #p.start()
     app.run(host=HOSTNAME,debug=True)
+    #p.join()
