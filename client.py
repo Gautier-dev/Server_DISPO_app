@@ -46,6 +46,10 @@ FREQ_INC_COARSE = 1e6
 FREQ_INC_FINE = 0.1e6
 GAIN_INC = 5
 
+# We count using these variables the number of time the program send 1 or 0 
+nb_1 = 0
+nb_0 = 0
+
 client = mqtt.Client()
 
 
@@ -132,18 +136,22 @@ class Waterfall(object):
         start_fc = self.sdr.fc
         samples_fc = self.sdr.read_samples(NUM_SAMPLES_PER_SCAN)
         psd_fc, f = psd(samples_fc, NFFT=NFFT)
-        moy_psd = 0
+        sum_psd = 0
        
         for i in range(2000, 2100):
-            moy_psd += float(10*np.log10(psd_fc[i]))
-       
-        if (moy_psd/100 > -40):
+            sum_psd += float(10*np.log10(psd_fc[i]))
+        if (nb_1 + nb_0) > 1000:
+            dispo = 1 if nb_1>nb_0 else 0
+            client.publish("laverie/1", "{},{}".format(102.5, dispo))
+            nb_0 = 0
+            nb_1 = 0
+        if (sum_psd/100 > -40):
             print("Receiving signal")
-            print(client.publish("laverie/1", "{},{}".format(102.5, 1)))
+            nb_1 += 1
            
         else:
             print("No signal")
-            print(client.publish("laverie/1", "{},{}".format(102.5, 0)))
+            nb_0 += 1
 
         # prepare space in buffer
         # TODO: use indexing to avoid recreating buffer each time
