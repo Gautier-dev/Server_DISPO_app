@@ -17,12 +17,19 @@ app.config['MQTT_USERNAME'] = 'slip'
 app.config['MQTT_PASSWORD'] = 'slip'
 app.config['MQTT_REFRESH_TIME'] = 1.0  # refresh time in seconds
 db = SQLAlchemy(app)
+
 mqtt = Mqtt()
 db.create_all()
 cors=CORS(app)
 
 def create_app():
     mqtt.init_app(app)
+
+
+
+db.create_all()
+cors=CORS(app)
+
 
 class Machine(db.Model):
     id=db.Column(db.Integer, primary_key=True)
@@ -162,6 +169,7 @@ def initDbCommand():
     initDb()
     click.echo('Initialized the database.')
 
+
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
     mqtt.subscribe('laverie/#')
@@ -176,6 +184,7 @@ def handle_mqtt_message(client, userdata, message):
     changeState(id_lav, float(payload.split(",")[0]), int(payload.split(",")[1]))
     machine = db.session.query(Machine).filter(Machine.id==1).first()
     print(machine.state)
+
 
 @app.route('/')
 def home():
@@ -197,5 +206,8 @@ def home():
     # return json.loads(file.read()) 
 
 if __name__ == "__main__":
+
     create_app()
+
+
     app.run(host=HOSTNAME,debug=True)
