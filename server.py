@@ -10,6 +10,8 @@ from multiprocessing import Process
 import time
 import os
 
+
+
 HOSTNAME = "127.0.0.1"
 DATABASE_URI = 'sqlite:///machines.db'
 
@@ -42,7 +44,7 @@ class Datapoint(db.Model):
     id=db.Column(db.Integer, primary_key=True)
     time=db.Column(db.Date, default=datetime.now())
     dispo=db.Column(db.Integer, nullable=False)
-    laund_id=db.relationship(db.Integer, db.ForeignKey('laund.id'))
+    laund_id=db.Column(db.Integer, db.ForeignKey('laund.id'), nullable=False)
 
 class Client(db.Model):
     id=db.Column(db.Integer, primary_key=True)
@@ -80,16 +82,33 @@ def addLaund(client_id, laund_id):
 
     setLaundList(client, laund_list)
 
-
 def new_data_point(laund, address):
     machines = getMachines(laund, address)
-    getAvailable(machines)
+    dispo = getAvailable(machines)
+    laund_id=findLaundId(laund,address)
+    datapoint = Datapoint(dispo=dispo, laund_id=laund_id)
+    db.session.add(datapoint)
+    db.session.commit()
+    print("commited datapoint")
 
 def metrics_loop(timestep_sec):
-    while True:
-        print("click ! ",os.getpid())
-        time.sleep(timestep_sec)
+
+    with app.app_context():
+        """
+        clients = Client.query.filter_by().all()
         
+        clients_id =[1]
+        clients = [findClient(1)]
+        print("CLIEEEEEEEEEEEEEEEEEENTS",clients)
+        if clients is not None:
+            for client in clients:
+                launds = getLaunds(client)
+                if launds is not None:
+                    for laund in launds:
+                        new_data_point(laund.name, laund.address)
+        """
+        print("click ! ",os.getpid())
+
 
 def newLaund(name, address):
     laund = Laund(name=name, address=address)
@@ -106,11 +125,12 @@ def newMachine(state, laund_id, freq, type_machine):
     db.session.commit()
 
 def changeState(laund_id, freq, newState):
+    print("changing state")
     machine = Machine.query.filter_by(laund_id=laund_id, frequency=freq).first()
     machine.state=newState
     db.session.commit()
-    mew_data_point(laund_id)
-
+    new_data_point(laund.name, laund.address)
+    
 def initDb():
     clearDb()
     newClient('Robin')
@@ -127,7 +147,9 @@ def initDb():
     newMachine('1', findLaundId('laverie de la terre','456 chemin'), 107.5, "seche-linge")
     newMachine('1', findLaundId('laverie de la terre','456 chemin'), 109.0, "seche-linge")
 
+    
     db.session.commit()
+
 
 def clearDb():
     clients = Client.query.all()
@@ -185,6 +207,7 @@ def initDbCommand():
     initDb()
     click.echo('Initialized the database.')
 
+
 """
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
@@ -222,7 +245,7 @@ def home():
     # return json.loads(file.read()) 
 
 if __name__ == "__main__":
-    #p = Process(target=metrics_loop, args=(5,))
-    #p.start()
     app.run(host=HOSTNAME,debug=True)
-    #p.join()
+
+    
+    
