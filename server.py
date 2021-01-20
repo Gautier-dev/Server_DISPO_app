@@ -5,12 +5,6 @@ from flask_cors import CORS
 from flask_mqtt import Mqtt
 import json 
 import click
-from datetime import datetime
-from multiprocessing import Process
-import time
-import os
-
-
 
 HOSTNAME = "127.0.0.1"
 DATABASE_URI = 'sqlite:///machines.db'
@@ -23,9 +17,19 @@ app.config['MQTT_USERNAME'] = 'slip'
 app.config['MQTT_PASSWORD'] = 'slip'
 app.config['MQTT_REFRESH_TIME'] = 1.0  # refresh time in seconds
 db = SQLAlchemy(app)
-#mqtt = Mqtt(app)
+
+mqtt = Mqtt()
 db.create_all()
 cors=CORS(app)
+
+def create_app():
+    mqtt.init_app(app)
+
+
+
+db.create_all()
+cors=CORS(app)
+
 
 class Machine(db.Model):
     id=db.Column(db.Integer, primary_key=True)
@@ -39,12 +43,6 @@ class Laund(db.Model):
     name=db.Column(db.String, nullable=False)
     address=db.Column(db.String, nullable=False)
     machines = db.relationship('Machine', backref='machines')
-
-class Datapoint(db.Model):
-    id=db.Column(db.Integer, primary_key=True)
-    time=db.Column(db.Date, default=datetime.now())
-    dispo=db.Column(db.Integer, nullable=False)
-    laund_id=db.Column(db.Integer, db.ForeignKey('laund.id'), nullable=False)
 
 class Client(db.Model):
     id=db.Column(db.Integer, primary_key=True)
@@ -82,34 +80,6 @@ def addLaund(client_id, laund_id):
 
     setLaundList(client, laund_list)
 
-def new_data_point(laund, address):
-    machines = getMachines(laund, address)
-    dispo = getAvailable(machines)
-    laund_id=findLaundId(laund,address)
-    datapoint = Datapoint(dispo=dispo, laund_id=laund_id)
-    db.session.add(datapoint)
-    db.session.commit()
-    print("commited datapoint")
-
-def metrics_loop(timestep_sec):
-
-    with app.app_context():
-        """
-        clients = Client.query.filter_by().all()
-        
-        clients_id =[1]
-        clients = [findClient(1)]
-        print("CLIEEEEEEEEEEEEEEEEEENTS",clients)
-        if clients is not None:
-            for client in clients:
-                launds = getLaunds(client)
-                if launds is not None:
-                    for laund in launds:
-                        new_data_point(laund.name, laund.address)
-        """
-        print("click ! ",os.getpid())
-
-
 def newLaund(name, address):
     laund = Laund(name=name, address=address)
     db.session.add(laund)
@@ -125,12 +95,10 @@ def newMachine(state, laund_id, freq, type_machine):
     db.session.commit()
 
 def changeState(laund_id, freq, newState):
-    print("changing state")
     machine = Machine.query.filter_by(laund_id=laund_id, frequency=freq).first()
     machine.state=newState
     db.session.commit()
-    new_data_point(laund.name, laund.address)
-    
+
 def initDb():
     clearDb()
     newClient('Robin')
@@ -147,9 +115,7 @@ def initDb():
     newMachine('1', findLaundId('laverie de la terre','456 chemin'), 107.5, "seche-linge")
     newMachine('1', findLaundId('laverie de la terre','456 chemin'), 109.0, "seche-linge")
 
-    
     db.session.commit()
-
 
 def clearDb():
     clients = Client.query.all()
@@ -163,10 +129,6 @@ def clearDb():
     launds = Laund.query.all()
     for laund in launds:
         db.session.delete(laund)
-
-    datapoints = Datapoint.query.all()
-    for datapoint in datapoints:
-        db.session.delete(datapoint)
 
     db.session.commit()
 
@@ -208,22 +170,21 @@ def initDbCommand():
     click.echo('Initialized the database.')
 
 
-"""
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
-    mqtt.subscribe('laveries/#')
-
+    mqtt.subscribe('laverie/#')
 
 @mqtt.on_message()
 def handle_mqtt_message(client, userdata, message):
-    data = dict(
-        topic=message.topic,
-        payload=message.payload.decode()
-    )
-
+    
+    topic=message.topic
+    payload=message.payload.decode('utf-8')
+    print("{},{}".format(topic,payload))
     id_lav = int(message.topic.split("/")[1])
-    changeState(id_lav, int(payload[0]), int(payload[1]))
-"""
+    changeState(id_lav, float(payload.split(",")[0]), int(payload.split(",")[1]))
+    machine = db.session.query(Machine).filter(Machine.id==1).first()
+    print(machine.state)
+
 
 @app.route('/')
 def home():
@@ -245,7 +206,8 @@ def home():
     # return json.loads(file.read()) 
 
 if __name__ == "__main__":
-    app.run(host=HOSTNAME,debug=True)
 
-    
-    
+    create_app()
+
+
+    app.run(host=HOSTNAME,debug=True)
