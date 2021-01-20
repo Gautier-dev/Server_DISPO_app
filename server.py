@@ -57,13 +57,13 @@ class Client(db.Model):
 class DatapointLaund(db.Model):
     id=db.Column(db.Integer, primary_key=True)
     dispo=db.Column(db.Integer, nullable=False)
-    timestamp=db.Column(db.DateTime,default=datetime.now())
+    timestamp=db.Column(db.DateTime,nullable=False)
     laund_id=db.Column(db.Integer, db.ForeignKey('laund.id'), nullable=False)
 
 class DatapointMachine(db.Model):
     id=db.Column(db.Integer, primary_key=True)
     state=db.Column(db.Integer, nullable=False)
-    timestamp=db.Column(db.DateTime,default=datetime.now())
+    timestamp=db.Column(db.DateTime,nullable=False)
     machine_id=db.Column(db.Integer, db.ForeignKey('machine.id'), nullable=False)
 
 
@@ -178,10 +178,10 @@ def createData(launds, machines):
         })
     return data
 
-def DatapointsToDict(laund_id,number,machine_id=None):
+def DatapointsToDict(laund_id,number):
     data=[]
 
-    datapoints = DatapointLaund.query.filter_by(laund_id=1).limit(number)
+    datapoints = DatapointLaund.query.filter_by(laund_id=laund_id).all()
     for i in range(number):
         data.append({
             'dispo': datapoints[i].dispo,
@@ -208,11 +208,11 @@ def record_loop(timestep):
             for laund_id in launds:
                 laund = Laund.query.filter_by(id=laund_id).first()
                 machines = getMachines(laund.name,laund.address)
-                datapoint_laund = DatapointLaund(dispo=getAvailable(machines), laund_id=laund_id)
+                datapoint_laund = DatapointLaund(dispo=getAvailable(machines), laund_id=laund_id,timestamp=datetime.now())
                 db.session.add(datapoint_laund)
                 db.session.commit()
                 for machine in machines:
-                    datapoint_machine = DatapointMachine(state=machine.state, machine_id=machine.id)
+                    datapoint_machine = DatapointMachine(state=machine.state, machine_id=machine.id,timestamp=datetime.now())
                     db.session.add(datapoint_machine)
                     db.session.commit()
         time.sleep(timestep)
@@ -263,15 +263,15 @@ def home():
 @app.route('/data/<laund_id>')
 def data_laund(laund_id):
     try :
+        client = findClient(int(request.args.get('id')))
         nombre = int(request.args.get('nombre'))
 
     except KeyError:
         print("error key")
     if client is not None:
         data = []
-        data = DatapointsToDict(laund_id=1,number=nombre,machine_id=None)
+        data = DatapointsToDict(laund_id=1,number=nombre)
         return jsonify(client="Laveries de "+client.name, datapoints=data)
-
     return jsonify(client="Tu n'es pas connecté")
 """
 @app.route('/data/<id_laund>/<id_machine>/<number>')
@@ -290,7 +290,7 @@ if __name__ == "__main__":
     initDb()
     #create_app()
     p = Process(target=record_loop, args=(5,))
-    p.start()  
+    p.start()
     app.run(host=HOSTNAME, debug=True, use_reloader=False)
     p.join()
 
