@@ -290,7 +290,7 @@ def data_laund(type, id_laund, id_machine, number):
 if __name__ == "__main__":
     initDb()
     #create_app()
-    p = Process(target=record_loop, args=(5,))
+    p = Process(target=record_loop, args=(60,))
     p.start()
     app.run(host=HOSTNAME, debug=True, use_reloader=False)
     p.join()
