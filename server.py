@@ -181,7 +181,7 @@ def createData(launds, machines):
 def DatapointsToDict(laund_id,number):
     data=[]
 
-    datapoints = DatapointLaund.query.filter_by(laund_id=laund_id).all()
+    datapoints = DatapointLaund.query.filter_by(laund_id=laund_id).order_by(DatapointLaund.timestamp.desc()).all()
     for i in range(number):
         data.append({
             'dispo': datapoints[i].dispo,
@@ -259,7 +259,8 @@ def home():
     return jsonify(client="Tu n'es pas connecté")
     
     # file = open('example.json')
-    # return json.loads(file.read()) 
+    # return json.loads(file.read())
+
 @app.route('/data/<laund_id>')
 def data_laund(laund_id):
     try :
@@ -270,7 +271,7 @@ def data_laund(laund_id):
         print("error key")
     if client is not None:
         data = []
-        data = DatapointsToDict(laund_id=1,number=nombre)
+        data = DatapointsToDict(laund_id=laund_id,number=nombre)
         return jsonify(client="Laveries de "+client.name, datapoints=data)
     return jsonify(client="Tu n'es pas connecté")
 """
