@@ -5,6 +5,10 @@ from flask_cors import CORS
 from flask_mqtt import Mqtt
 import json 
 import click
+from datetime import datetime
+from multiprocessing import Process
+import time
+import os 
 
 HOSTNAME = "127.0.0.1"
 DATABASE_URI = 'sqlite:///machines.db'
@@ -18,8 +22,7 @@ app.config['MQTT_PASSWORD'] = 'slip'
 app.config['MQTT_REFRESH_TIME'] = 1.0  # refresh time in seconds
 db = SQLAlchemy(app)
 
-mqtt = Mqtt()
-db.create_all()
+#mqtt = Mqtt()
 cors=CORS(app)
 
 def create_app():
@@ -27,7 +30,7 @@ def create_app():
 
 
 
-db.create_all()
+
 cors=CORS(app)
 
 
@@ -42,12 +45,29 @@ class Laund(db.Model):
     id=db.Column(db.Integer, primary_key=True)
     name=db.Column(db.String, nullable=False)
     address=db.Column(db.String, nullable=False)
+    gps_lat=db.Column(db.Float, nullable=False)
+    gps_lng=db.Column(db.Float, nullable=False)
     machines = db.relationship('Machine', backref='machines')
 
 class Client(db.Model):
     id=db.Column(db.Integer, primary_key=True)
     name=db.Column(db.String, nullable=False)
     laund_list=db.Column(db.String)
+
+class DatapointLaund(db.Model):
+    id=db.Column(db.Integer, primary_key=True)
+    dispo=db.Column(db.Integer, nullable=False)
+    timestamp=db.Column(db.DateTime,default=datetime.now())
+    laund_id=db.Column(db.Integer, db.ForeignKey('laund.id'), nullable=False)
+
+class DatapointMachine(db.Model):
+    id=db.Column(db.Integer, primary_key=True)
+    state=db.Column(db.Integer, nullable=False)
+    timestamp=db.Column(db.DateTime,default=datetime.now())
+    machine_id=db.Column(db.Integer, db.ForeignKey('machine.id'), nullable=False)
+
+
+db.create_all()
 
 def newClient(name):
     client = Client(name=name, laund_list="[]")
@@ -80,8 +100,8 @@ def addLaund(client_id, laund_id):
 
     setLaundList(client, laund_list)
 
-def newLaund(name, address):
-    laund = Laund(name=name, address=address)
+def newLaund(name, address,gps_lat,gps_lng):
+    laund = Laund(name=name, address=address,gps_lat=gps_lat, gps_lng=gps_lng)
     db.session.add(laund)
     db.session.commit()
 
@@ -102,8 +122,8 @@ def changeState(laund_id, freq, newState):
 def initDb():
     clearDb()
     newClient('Robin')
-    newLaund('laverie du port','123 rue du port')
-    newLaund('laverie de la terre','456 chemin')
+    newLaund('laverie du port','123 rue du port',gps_lat=45.77010440000001,gps_lng=4.8826282)
+    newLaund('laverie de la terre','456 chemin',gps_lat=45.7578137,gps_lng=4.8320114)
     addLaund(1,1)
     addLaund(1,2)
     newMachine('0',findLaundId('laverie du port','123 rue du port'), 102.5,"machine")
@@ -148,19 +168,55 @@ def createData(launds, machines):
     data=[]
     for i in range(len(launds)):
         data.append({
+            'id': launds[i].id,
             'name': launds[i].name,
             'adresse': launds[i].address,
             'dispo': getAvailable(machines[i]),
+            'geo_lat':launds[i].gps_lat,
+            'geo_lng':launds[i].gps_lng,
             'max' : len(machines[i])
         })
     return data
 
+def DatapointsToDict(laund_id,number,machine_id=None):
+    data=[]
+
+    datapoints = DatapointLaund.query.filter_by(laund_id=1).limit(number)
+    for i in range(number):
+        data.append({
+            'dispo': datapoints[i].dispo,
+            'timestamp' : datapoints[i].timestamp
+        })
+
+    
+    return data
+    
+    
 def getAvailable(machines):
     num =0
     for machine in machines:
         if machine.state==0:
             num= num+1
     return num
+
+def record_loop(timestep):
+    # Register datapoints every timestep seconds 
+    while True:
+        clients=Client.query.filter_by().all()
+        for client in clients:
+            launds=getLaundList(client)
+            for laund_id in launds:
+                laund = Laund.query.filter_by(id=laund_id).first()
+                machines = getMachines(laund.name,laund.address)
+                datapoint_laund = DatapointLaund(dispo=getAvailable(machines), laund_id=laund_id)
+                db.session.add(datapoint_laund)
+                db.session.commit()
+                for machine in machines:
+                    datapoint_machine = DatapointMachine(state=machine.state, machine_id=machine.id)
+                    db.session.add(datapoint_machine)
+                    db.session.commit()
+        time.sleep(timestep)
+        print("new datapoint from process : ",os.getpid())
 
 @app.cli.command('init-db')
 def initDbCommand():
@@ -169,7 +225,7 @@ def initDbCommand():
     initDb()
     click.echo('Initialized the database.')
 
-
+"""
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
     mqtt.subscribe('laverie/#')
@@ -184,7 +240,7 @@ def handle_mqtt_message(client, userdata, message):
     changeState(id_lav, float(payload.split(",")[0]), int(payload.split(",")[1]))
     machine = db.session.query(Machine).filter(Machine.id==1).first()
     print(machine.state)
-
+"""
 
 @app.route('/')
 def home():
@@ -204,10 +260,37 @@ def home():
     
     # file = open('example.json')
     # return json.loads(file.read()) 
+@app.route('/data/<laund_id>')
+def data_laund(laund_id):
+    try :
+        nombre = int(request.args.get('nombre'))
 
+    except KeyError:
+        print("error key")
+    if client is not None:
+        data = []
+        data = DatapointsToDict(laund_id=1,number=nombre,machine_id=None)
+        return jsonify(client="Laveries de "+client.name, datapoints=data)
+
+    return jsonify(client="Tu n'es pas connecté")
+"""
+@app.route('/data/<id_laund>/<id_machine>/<number>')
+def data_laund(type, id_laund, id_machine, number):
+    try :
+        client = findClient(int(request.args.get('id')))
+    except KeyError:
+        print("error key")
+    if client is not None:
+        data
+        return jsonify(client="Laveries de "+client.name, stations=data)
+
+    return jsonify(client="Tu n'es pas connecté")
+"""
 if __name__ == "__main__":
+    initDb()
+    #create_app()
+    p = Process(target=record_loop, args=(5,))
+    p.start()  
+    app.run(host=HOSTNAME, debug=True, use_reloader=False)
+    p.join()
 
-    create_app()
-
-
-    app.run(host=HOSTNAME,debug=True)
