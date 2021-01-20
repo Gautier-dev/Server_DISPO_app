@@ -182,6 +182,8 @@ def DatapointsToDict(laund_id,number):
     data=[]
 
     datapoints = DatapointLaund.query.filter_by(laund_id=laund_id).order_by(DatapointLaund.timestamp.desc()).all()
+    if len(datapoints)<number:
+        number = len(datapoints)
     for i in range(number):
         data.append({
             'dispo': datapoints[i].dispo,
